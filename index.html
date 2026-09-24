@@ -44,6 +44,13 @@ button,input{font:inherit} button{cursor:pointer;border:0}.app{max-width:1120px;
 .pool-empty h3{margin:0 0 8px;font-size:20px}
 .pool-empty p{margin:0;color:#745619}
 
+
+.uk-voice-tip{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:9px 11px;background:#eef4ff;border:1px solid #c5d4f0;border-radius:11px;color:#294b9b;font-size:12px;font-weight:600;line-height:1.4}
+.uk-voice-tip[hidden]{display:none!important}
+.uk-voice-tip-text{flex:1}
+.uk-voice-tip-dismiss{flex:none;background:transparent;border:0;color:#294b9b;font-size:18px;line-height:1;padding:0 2px;cursor:pointer;font-weight:800}
+.uk-voice-tip-dismiss:hover{opacity:.7}
+
 </style>
 </head>
 <body>
@@ -1667,7 +1674,88 @@ function showEmptyPool(){
 
 function renderQuestion(){let l=activeLevels()[state.level];state.current=makeQ(l.kind);state.wrong=0;state.hintShown=false;questionStartedAt=Date.now();$('levelCrumb').textContent=`Level ${state.level+1} · ${l.name}`;let target=state.levelTarget||3;$('streakText').textContent=`Question ${state.question+1} of ${target}`;$('questionText').textContent=state.current.text;$('progressLabel').textContent=`${state.question} of ${target} correct`;$('progressBar').style.width=(state.question/target*100)+'%';$('progressHint').textContent=state.question?`${target-state.question} correct answer${target-state.question===1?'':'s'} to complete this level.`:`Get all ${target} right to unlock the next level.`;rememberPlayed(state.current);$('habitText').textContent=state.current.type==='choice'?'Read every option before choosing.':'Read the question twice. Then choose a method.';$('feedback').innerHTML='';let area=$('answerArea');area.innerHTML='';if(state.current.type==='choice'){let selected=null;let o=document.createElement('div');o.className='options';let checkBtn=document.createElement('button');checkBtn.type='button';checkBtn.className='submit';checkBtn.textContent='Check answer';checkBtn.disabled=true;checkBtn.onclick=()=>{if(selected!=null)submitAnswer(selected,checkBtn)};state.current.options.forEach(opt=>{let b=document.createElement('button');b.type='button';b.className='option';b.textContent=opt;b.onclick=()=>{if(b.disabled)return;selected=opt;o.querySelectorAll('.option').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');checkBtn.disabled=false};o.appendChild(b)});area.appendChild(o);let checkWrap=document.createElement('div');checkWrap.className='choice-check';checkWrap.appendChild(checkBtn);area.appendChild(checkWrap)}else{let row=document.createElement('div');row.className='answer-row';let input=document.createElement('input');input.className='answer-input';input.placeholder='Type your answer';input.autocomplete='off';input.setAttribute('aria-label','Your answer');let btn=document.createElement('button');btn.className='submit';btn.textContent='Check answer';btn.onclick=()=>submitAnswer(input.value,btn);input.onkeydown=e=>{if(e.key==='Enter')submitAnswer(input.value,btn)};row.append(input,btn);area.appendChild(row);setTimeout(()=>input.focus(),50)} appendHintUI(area,state.current) }
 function appendHintUI(area,q){if(!q.hint)return;let wrap=document.createElement('div');wrap.className='hint-wrap';let actions=document.createElement('div');actions.className='hint-actions';let hintBtn=document.createElement('button');hintBtn.type='button';hintBtn.className='hint-btn';hintBtn.id='hintBtn';hintBtn.textContent='Hint';let hearBtn=document.createElement('button');hearBtn.type='button';hearBtn.className='hint-hear hidden';hearBtn.id='hearHintBtn';hearBtn.textContent='🔊 Hear hint';let box=document.createElement('div');box.className='hint-box';box.id='hintBox';box.setAttribute('aria-live','polite');hintBtn.onclick=()=>{if(state.hintShown)return;state.hintShown=true;noteHintClicked();box.textContent=q.hint;box.classList.add('show');hintBtn.disabled=true;hintBtn.textContent='Hint shown';hearBtn.classList.remove('hidden')};hearBtn.onclick=()=>{if(!state.hintShown)return;speak(q.hint)};actions.append(hintBtn,hearBtn);wrap.append(actions,box);area.appendChild(wrap)}
-function speak(text){if('speechSynthesis'in window){speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(text);u.lang='en-GB';u.rate=.92;speechSynthesis.speak(u)}}
+/* British English TTS — prefer an en-GB / UK system voice */
+let preferredUkVoice=null;
+let ukVoiceTipShown=false;
+
+function isUkVoice(v){
+  if(!v) return false;
+  const lang=String(v.lang||'').toLowerCase();
+  const blob=(String(v.name||'')+' '+String(v.voiceURI||'')).toLowerCase();
+  if(lang.startsWith('en-gb')) return true;
+  return /british|united kingdom|\buk\b|en-gb|english\s*\(\s*uk\s*\)|english\s*\(\s*united kingdom\s*\)/.test(blob);
+}
+function scoreUkVoice(v){
+  const n=String(v.name||'').toLowerCase();
+  let score=0;
+  if(String(v.lang||'').toLowerCase().startsWith('en-gb')) score+=10;
+  if(/serena|amy|emma|libby|susan|kate|hazel|martha|sonia|aria|jenny|moira|fiona|karen|zira/.test(n)) score+=8;
+  if(/female|woman|girl/.test(n)) score+=5;
+  if(/child|kid|kids|junior/.test(n)) score+=3;
+  if(v.localService) score+=1;
+  if(/male|daniel|george|oliver|arthur|ryan|thomas|david|mark/.test(n)) score-=2;
+  return score;
+}
+function pickUkVoice(voices){
+  const uk=(voices||[]).filter(isUkVoice);
+  if(!uk.length) return null;
+  uk.sort((a,b)=>scoreUkVoice(b)-scoreUkVoice(a));
+  return uk[0];
+}
+function refreshUkVoice(){
+  if(!('speechSynthesis' in window)) return;
+  preferredUkVoice=pickUkVoice(speechSynthesis.getVoices()||[]);
+}
+function ensureUkVoiceTipEl(){
+  let tip=document.getElementById('ukVoiceTip');
+  if(tip) return tip;
+  tip=document.createElement('div');
+  tip.id='ukVoiceTip';
+  tip.className='uk-voice-tip';
+  tip.setAttribute('role','status');
+  tip.hidden=true;
+  tip.innerHTML='<span class="uk-voice-tip-text">British English tip — install or enable the <strong>English (United Kingdom)</strong> speech voice in system settings (Windows: Settings → Time &amp; Language → Speech; macOS: System Settings → Accessibility → Spoken Content).</span><button type="button" class="uk-voice-tip-dismiss" aria-label="Dismiss tip">×</button>';
+  tip.querySelector('.uk-voice-tip-dismiss').onclick=function(){tip.hidden=true};
+  const soundBtn=document.getElementById('soundBtn');
+  const note=soundBtn&&(soundBtn.closest('.note')||soundBtn.closest('.side-note'));
+  if(note) note.appendChild(tip);
+  else{
+    const fb=document.getElementById('feedback');
+    if(fb) fb.parentNode.insertBefore(tip, fb.nextSibling);
+    else document.body.appendChild(tip);
+  }
+  return tip;
+}
+function showUkVoiceTipIfNeeded(){
+  if(ukVoiceTipShown||preferredUkVoice) return;
+  ukVoiceTipShown=true;
+  const tip=ensureUkVoiceTipEl();
+  tip.hidden=false;
+}
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  if(!preferredUkVoice) refreshUkVoice();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-GB';
+  u.rate=0.92;
+  if(preferredUkVoice){
+    u.voice=preferredUkVoice;
+  }else{
+    showUkVoiceTipIfNeeded();
+  }
+  speechSynthesis.speak(u);
+}
+function initUkTts(){
+  if(!('speechSynthesis' in window)) return;
+  refreshUkVoice();
+  if(typeof speechSynthesis.addEventListener==='function'){
+    speechSynthesis.addEventListener('voiceschanged', refreshUkVoice);
+  }else{
+    speechSynthesis.onvoiceschanged=refreshUkVoice;
+  }
+}
+initUkTts();
 function submitAnswer(value,clicked){if(!String(value).trim())return;let q=state.current;let correct=isCorrect(value,q);document.querySelectorAll('.option,.submit,.answer-input').forEach(x=>x.disabled=true);let qMs=questionStartedAt?Date.now()-questionStartedAt:0;let lvl=activeLevels()[state.level];let meta={subjectKey:subjectKeyForStats(),level:state.level,levelName:lvl?lvl.name:('Level '+(state.level+1)),questionMs:qMs,usedHint:!!state.hintShown};if(correct){logQuestionResult(Object.assign({correct:true,revealed:false},meta));state.question++;state.streak++;state.best=Math.max(state.best,state.streak);const why=explain(q);$('feedback').innerHTML=`<div class="feedback-box good">✓ ${escapeHtml(q.praise)}<div class="explain"><div class="why-row"><span class="why-heading">Why this is right</span><button type="button" class="hear-explain" id="hearExplainBtn">▶ Hear explanation</button></div>${escapeHtml(why)}</div><button type="button" class="continue-btn" id="continueBtn">Continue</button></div>`;speak((q.praise||'')+'. '+(why||'').trim());save();document.querySelectorAll('.option,.submit,.answer-input,.hint-btn,.hint-hear').forEach(x=>x.disabled=true);$('hearExplainBtn').onclick=()=>speak(why);$('continueBtn').onclick=()=>{if(state.question>=(state.levelTarget||3))completeLevel();else renderQuestion()}}else{state.wrong++;state.streak=0;let reveal=state.wrong>=2;if(reveal){logReveal(meta);const whyReveal=explain(q);$('feedback').innerHTML=`<div class="feedback-box reveal">The answer is <strong>${escapeHtml(String(q.answers[0]))}</strong>.<div class="explain"><div class="why-row"><span class="why-heading">Why this is right</span><button type="button" class="hear-explain" id="hearExplainBtn">▶ Hear explanation</button></div>${escapeHtml(whyReveal)}</div><button type="button" class="continue-btn" id="continueBtn">Continue</button></div>`;speak(`Here is the answer. ${q.answers[0]}. ${whyReveal}`);$('hearExplainBtn').onclick=()=>speak(whyReveal);$('continueBtn').onclick=()=>renderQuestion()}else{/* first incorrect try — count towards trouble soft tally */if(levelAttempt){levelAttempt.wrong++;let sub=ensureSubject(meta.subjectKey);let lv=ensureLevel(sub,meta.level,meta.levelName);sub.wrong++;lv.wrong++;saveStats();}$('feedback').innerHTML=`<div class="feedback-box try">Not quite yet. ${q.hint}<div class="explain">Have another go using that method.</div></div>`;speak(q.hint);setTimeout(()=>{document.querySelectorAll('.option,.answer-input').forEach(x=>x.disabled=false);const hasChoices=!!document.querySelector('.options');document.querySelectorAll('.submit').forEach(btn=>{if(hasChoices){btn.disabled=!document.querySelector('.option.selected')}else{btn.disabled=false}});let inp=document.querySelector('.answer-input');if(inp)inp.focus()},650)}}}
 function explain(q){if(q.explain)return q.explain;let a=q.answers[0];if(q.text.includes('×'))return `Multiply equal groups: ${q.text.split('=')[0].trim()} gives ${a}.`;if(q.text.toLowerCase().includes('place'))return `The digit's place tells its value.`;return 'Use the method in the hint carefully, then check your answer.'}
 function completeLevel(){finishLevelAttempt(true,false);let key=completionKey(),done=state.completed[key]||[];if(!done.includes(state.level))done.push(state.level);state.completed[key]=done;save();$('playScreen').classList.remove('active');$('completeScreen').classList.add('active');let levels=activeLevels(),last=state.level===levels.length-1;$('completeTitle').textContent=last?'You finished the quest!':'Level unlocked!';$('completeText').textContent=last?`Brilliant work. You completed all five levels in ${state.subject}.`:`${state.levelTarget||3} in a row — ${levels[state.level].name} is complete.`;$('nextBtn').textContent=last?'See your subjects':'Next level';$('nextBtn').onclick=()=>{if(last)renderHome();else startLevel(state.level+1)};speak(last?'You finished the quest! Brilliant work.':'Level unlocked! Great thinking!')}
