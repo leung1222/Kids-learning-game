@@ -1750,7 +1750,7 @@ function ensureUkVoiceTipEl(){
   tip.className='uk-voice-tip';
   tip.setAttribute('role','status');
   tip.hidden=true;
-  tip.innerHTML='<span class="uk-voice-tip-text">For a more natural British voice: Windows → Settings → Time &amp; Language → Speech → add <strong>English (United Kingdom)</strong>, then pick a <strong>neural / Online</strong> voice (e.g. Libby or Ryan). Chrome also offers Google UK English. Classic desktop voices sound robotic.</span><button type="button" class="uk-voice-tip-dismiss" aria-label="Dismiss tip">×</button>';
+  tip.innerHTML='<span class="uk-voice-tip-text">For a more natural British voice — <strong>iPhone:</strong> Settings → Accessibility → Spoken Content → Voices → English → English (United Kingdom), download an <strong>Enhanced / Premium</strong> voice (e.g. Serena), then reopen Safari and pick the ★ UK voice in the game. <strong>Windows:</strong> Settings → Time &amp; Language → Speech → UK neural / Online (Libby or Ryan). Classic desktop voices sound robotic.</span><button type="button" class="uk-voice-tip-dismiss" aria-label="Dismiss tip">×</button>';
   tip.querySelector('.uk-voice-tip-dismiss').onclick=function(){tip.hidden=true};
   const soundBtn=document.getElementById('soundBtn');
   const note=soundBtn&&(soundBtn.closest('.note')||soundBtn.closest('.side-note'));
