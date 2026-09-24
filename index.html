@@ -1621,7 +1621,20 @@ function activeLevels(){
  return SUBJECT_LEVELS[state.track][state.subject];
 }
 function completionKey(){return state.subject==='Maths'?state.track:`${state.track}|${state.subject}`}
-function subjectNames(){return ['Maths',...Object.keys(SUBJECT_LEVELS[state.track])]}
+const Y8_SUBJECT_ORDER=['English','Science','History','Geography','Computing','RE','PSHE','Drama','Art','Music','MFL French','D&T','PE'];
+function subjectNames(){
+  if(state.track==='y8'){
+    const avail=new Set(Object.keys(SUBJECT_LEVELS.y8||{}));
+    const ordered=Y8_SUBJECT_ORDER.filter(n=>avail.has(n));
+    for(const n of Object.keys(SUBJECT_LEVELS.y8||{})){ if(!ordered.includes(n)) ordered.push(n); }
+    return ['Maths',...ordered];
+  }
+  return ['Maths',...Object.keys(SUBJECT_LEVELS[state.track])];
+}
+function subjectDisplayName(name){
+  if(state.track==='y8' && name==='RE') return 'PRE';
+  return name;
+}
 
 const $=id=>document.getElementById(id);
 function save(){localStorage.setItem('nq-completed',JSON.stringify(state.completed));localStorage.setItem('nq-best',String(state.best))}
@@ -1653,9 +1666,9 @@ function isCorrect(value,q){if(q.exact){let t=String(value).trim();return q.answ
 function renderHome(){
  renderMonthSelector();
  $('homeScreen').classList.add('active');$('playScreen').classList.remove('active');$('completeScreen').classList.remove('active');let cfg=LEVEL_CONFIG[state.track];$('trackTitle').textContent=cfg.title;$('trackIntro').textContent=cfg.intro;$('characterLabel').textContent=cfg.character;document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$(state.track==='y3'?'y3Tab':'y8Tab').classList.add('active');
- let sg=$('subjectGrid');sg.innerHTML='';subjectNames().forEach(name=>{let subjectKey=name==='Maths'?state.track:`${state.track}|${name}`;let b=document.createElement('button');b.className='subject'+(name===state.subject?' active':'')+((state.completed[subjectKey]||[]).length?' done':'');b.textContent=name;b.onclick=()=>{state.subject=name;renderHome()};sg.appendChild(b)});
+ let sg=$('subjectGrid');sg.innerHTML='';subjectNames().forEach(name=>{let subjectKey=name==='Maths'?state.track:`${state.track}|${name}`;let b=document.createElement('button');b.className='subject'+(name===state.subject?' active':'')+((state.completed[subjectKey]||[]).length?' done':'');b.textContent=subjectDisplayName(name);b.setAttribute('aria-label',subjectDisplayName(name)==='PRE'?'PRE (Religious Education)':subjectDisplayName(name));b.onclick=()=>{state.subject=name;renderHome()};sg.appendChild(b)});
  $('subjectHint').textContent='Every subject has five progressive levels. Three correct answers in a row unlock the next level.';
- let levels=activeLevels(),grid=$('levelGrid'),done=state.completed[completionKey()]||[];grid.innerHTML='';$('levelHeading').textContent=`${state.subject} levels`;levels.forEach((l,i)=>{let unlocked=i===0||done.includes(i-1);let b=document.createElement('button');b.className='level-card'+(done.includes(i)?' done':'');b.disabled=!unlocked;b.innerHTML=`<span class="level-number">${i+1}</span><strong>${l.name}</strong><small>${l.short}</small>${done.includes(i)?'<span class="done-mark">✓</span>':(!unlocked?'<span class="lock">🔒</span>':'')}`;b.onclick=()=>startLevel(i);grid.appendChild(b)});$('completedCount').textContent=done.length;$('bestStreak').textContent=state.best}
+ let levels=activeLevels(),grid=$('levelGrid'),done=state.completed[completionKey()]||[];grid.innerHTML='';$('levelHeading').textContent=`${subjectDisplayName(state.subject)} levels`;levels.forEach((l,i)=>{let unlocked=i===0||done.includes(i-1);let b=document.createElement('button');b.className='level-card'+(done.includes(i)?' done':'');b.disabled=!unlocked;b.innerHTML=`<span class="level-number">${i+1}</span><strong>${l.name}</strong><small>${l.short}</small>${done.includes(i)?'<span class="done-mark">✓</span>':(!unlocked?'<span class="lock">🔒</span>':'')}`;b.onclick=()=>startLevel(i);grid.appendChild(b)});$('completedCount').textContent=done.length;$('bestStreak').textContent=state.best}
 
 function startLevel(i){if(levelAttempt)finishLevelAttempt(false,true);state.level=i;state.question=0;state.streak=0;state.wrong=0;prepareLevelQueue();startSession();beginLevelAttempt(i);$('homeScreen').classList.remove('active');$('playScreen').classList.add('active');$('completeScreen').classList.remove('active');if(!state.levelTarget){showEmptyPool();return}renderQuestion()}
 
